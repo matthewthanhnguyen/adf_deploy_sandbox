@@ -17,7 +17,7 @@ terraform {
 }
 
 provider "azurerm" {
-  version = ">= 2.49.0"
+  version = "2.49.0"
   features {}
   use_msi = true
 subscription_id = "b54182d2-60c0-4e34-b1ab-499a3394771d"
