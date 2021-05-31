@@ -64,10 +64,10 @@ resource "azurerm_data_factory" "adf_test" {
 
   github_configuration {
     account_name    = "<>"
-    branch_name     = "adf_dev"
+    branch_name     = "main"
     git_url         = "https://github.com"
-    repository_name = "adf_automation"
-    root_folder     = "/adf_artifacts"
+    repository_name = "adf_deploy_sandbox"
+    root_folder     = "/"
   }
 
 }
