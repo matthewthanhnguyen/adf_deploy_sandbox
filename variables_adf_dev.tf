@@ -5,5 +5,5 @@ variable "resource-group-dev" {
 
 variable "resource-location" {
   description = "The location to deploy instances in"
-  default     = "East US"
+  default     = "Canada Central"
 }
