@@ -1,5 +1,4 @@
-#File: adf_deploy_sandbox/main_adf_dev.tf
-
+#### Trial 1 ####
 #terraform {
 #  backend "azurerm" {
 #    resource_group_name   = "<>"
@@ -8,33 +7,58 @@
 #    key                   = "terraform_dev.tfstate"
 #  }
 #}
+
+#### Trial 2 ####
+# terraform {
+#     backend "azurerm" {
+#         resource_group_name     = "iww_sandbox"
+#         storage_account_name    = "opstf"
+#         container_name          = "tfstatedevops"
+#         # key                     = "sbx/terraform.tfstate"
+#     }
+# }
+
+# provider "azurerm" {
+#   version = "2.49.0"
+#   features {}
+#   #use_msi = true
+# subscription_id = "b54182d2-60c0-4e34-b1ab-499a3394771d"
+
+#   backend "azurerm" {
+#     storage_account_name = "opstf"
+#         container_name   = "tfstatedevops"
+#     key                  = "prod.terraform.tfstate"
+#     #subscription_id      = "b54182d2-60c0-4e34-b1ab-499a3394771d"
+#     subscription_id      = "37cec637-3adc-483c-b796-63d3760f6ead"
+#     tenant_id            = "e0793d39-0939-496d-b129-198edd916feb"
+#   }
+# }
+
+#### Trial 3 ####
 terraform {
-    backend "azurerm" {
-        resource_group_name     = "iww_sandbox"
-        storage_account_name    = "opstf"
-        container_name          = "tfstatedevops"
-        # key                     = "sbx/terraform.tfstate"
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "=2.46.0"
     }
-}
-
-provider "azurerm" {
-  version = "2.49.0"
-  features {}
-  use_msi = true
-subscription_id = "b54182d2-60c0-4e34-b1ab-499a3394771d"
-
-  backend "azurerm" {
-    storage_account_name = "opstf"
-        container_name   = "tfstatedevops"
-    key                  = "prod.terraform.tfstate"
-    subscription_id      = "b54182d2-60c0-4e34-b1ab-499a3394771d"
-    tenant_id            = "e0793d39-0939-496d-b129-198edd916feb"
   }
 }
 
+# Configure the Microsoft Azure Provider
+provider "azurerm" {
+  features {}
+  #subscription_id      = "37cec637-3adc-483c-b796-63d3760f6ead"
+  subscription_id		= "b54182d2-60c0-4e34-b1ab-499a3394771d"
+}
+
+resource "azurerm_resource_group" "resource-group-dev" {
+  name     = var.resource-group-dev
+  location = var.resource-location
+}
 
 resource "azurerm_storage_account" "adf_storage" {
-  name                     = "<>"
+  #name                     = "<>"
+  name					   = "adfstorageal"
   resource_group_name      = var.resource-group-dev
   location                 = var.resource-location
   account_tier             = "Standard"
@@ -59,7 +83,8 @@ resource "azurerm_storage_container" "adf_storage_target_01" {
 }
 
 resource "azurerm_data_factory" "adf_test" {
-  name                = "<>"
+  #name                = "<>"
+  name				  = "adftestal"
   resource_group_name = var.resource-group-dev
   location            = var.resource-location
 
