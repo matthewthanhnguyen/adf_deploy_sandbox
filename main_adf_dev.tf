@@ -129,14 +129,14 @@ resource "azurerm_data_factory_pipeline" "adf_pipeline_01" {
   resource_group_name = var.resource-group-dev
   data_factory_name   = azurerm_data_factory.adf_test.name
 
-  activities_json = <<JSON
-
-  {
+activities_json = <<JSON
+[{
+    "name": "adfpipeline01",
     "properties": {
         "activities": [
             {
-                "name": "PI Tag CSV to Table",
-                "type": "Copy",
+                "name": "adfpipeline01",
+                "type": "activity",
                 "dependsOn": [],
                 "policy": {
                     "timeout": "7.00:00:00",
@@ -145,146 +145,22 @@ resource "azurerm_data_factory_pipeline" "adf_pipeline_01" {
                     "secureOutput": false,
                     "secureInput": false
                 },
-                "userProperties": [],
-                "typeProperties": {
-                    "source": {
-                        "type": "DelimitedTextSource",
-                        "storeSettings": {
-                            "type": "AzureBlobStorageReadSettings",
-                            "recursive": true,
-                            "wildcardFolderPath": "iww/collection=batch/dataset=oilsands/*",
-                            "wildcardFileName": "*.csv",
-                            "enablePartitionDiscovery": false
-                        },
-                        "formatSettings": {
-                            "type": "DelimitedTextReadSettings"
-                        }
-                    },
-                    "sink": {
-                        "type": "AzureSqlSink",
-                        "tableOption": "autoCreate"
-                    },
-                    "enableStaging": false,
-                    "enableSkipIncompatibleRow": true,
-                    "translator": {
-                        "type": "TabularTranslator",
-                        "mappings": [
-                            {
-                                "source": {
-                                    "type": "String",
-                                    "ordinal": 1
-                                },
-                                "sink": {
-                                    "name": "Site",
-                                    "type": "String",
-                                    "physicalType": "nvarchar"
-                                }
-                            },
-                            {
-                                "source": {
-                                    "type": "String",
-                                    "ordinal": 2
-                                },
-                                "sink": {
-                                    "name": "Tag",
-                                    "type": "String",
-                                    "physicalType": "nvarchar"
-                                }
-                            },
-                            {
-                                "source": {
-                                    "type": "String",
-                                    "ordinal": 3
-                                },
-                                "sink": {
-                                    "name": "Date",
-                                    "type": "DateTime",
-                                    "physicalType": "date"
-                                }
-                            },
-                            {
-                                "source": {
-                                    "type": "String",
-                                    "ordinal": 4
-                                },
-                                "sink": {
-                                    "name": "Value",
-                                    "type": "Double",
-                                    "physicalType": "float"
-                                }
-                            },
-                            {
-                                "source": {
-                                    "type": "String",
-                                    "ordinal": 5
-                                },
-                                "sink": {
-                                    "name": "AvgValue",
-                                    "type": "Double",
-                                    "physicalType": "float"
-                                }
-                            }
-                        ],
-                        "typeConversion": true,
-                        "typeConversionSettings": {
-                            "allowDataTruncation": true,
-                            "treatBooleanAsNumber": false
-                        }
-                    }
-                },
-                "inputs": [
-                    {
-                        "referenceName": "pi_data_csv",
-                        "type": "DatasetReference"
-                    }
-                ],
-                "outputs": [
-                    {
-                        "referenceName": "pi_tag_table",
-                        "type": "DatasetReference"
-                    }
-                ]
+                "userProperties": []
             },
             {
-                "name": "PI Tag Flow",
-                "type": "ExecuteDataFlow",
-                "dependsOn": [
-                    {
-                        "activity": "PI Tag CSV to Table",
-                        "dependencyConditions": [
-                            "Succeeded"
-                        ]
-                    }
-                ],
-                "policy": {
-                    "timeout": "7.00:00:00",
-                    "retry": 0,
-                    "retryIntervalInSeconds": 30,
-                    "secureOutput": false,
-                    "secureInput": false
-                },
+                "name": "Wait1",
+                "type": "Wait",
+                "dependsOn": [],
                 "userProperties": [],
                 "typeProperties": {
-                    "dataflow": {
-                        "referenceName": "PI Tag Flow",
-                        "type": "DataFlowReference"
-                    },
-                    "compute": {
-                        "coreCount": 8,
-                        "computeType": "General"
-                    },
-                    "traceLevel": "Fine"
+                    "waitTimeInSeconds": 1
                 }
             }
         ],
-        "folder": {
-            "name": "IWW"
-        },
         "annotations": [],
-        "lastPublishTime": "2021-02-12T18:51:50Z"
+        "lastPublishTime": "2021-06-21T19:41:42Z"
     },
     "type": "Microsoft.DataFactory/factories/pipelines"
-}
-]
+}]
 JSON
 }
