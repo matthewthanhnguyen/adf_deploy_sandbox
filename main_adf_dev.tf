@@ -89,7 +89,7 @@ resource "azurerm_data_factory" "adf_test" {
   location            = var.resource-location
 
   github_configuration {
-    account_name    = "<>"
+    account_name    = "hagan3"
     branch_name     = "main"
     git_url         = "https://github.com"
     repository_name = "adf_deploy_sandbox"
@@ -125,42 +125,26 @@ resource "azurerm_data_factory_dataset_azure_blob" "adf_ds_blob_02" {
 }
 
 resource "azurerm_data_factory_pipeline" "adf_pipeline_01" {
-  name                = "adfpipeline01"
+  name                = "adfpipeline02"
   resource_group_name = var.resource-group-dev
   data_factory_name   = azurerm_data_factory.adf_test.name
 
 activities_json = <<JSON
 [{
-    "name": "adfpipeline01",
-    "properties": {
-        "activities": [
-            {
-                "name": "adfpipeline01",
-                "type": "activity",
-                "dependsOn": [],
-                "policy": {
-                    "timeout": "7.00:00:00",
-                    "retry": 0,
-                    "retryIntervalInSeconds": 30,
-                    "secureOutput": false,
-                    "secureInput": false
-                },
-                "userProperties": []
-            },
-            {
-                "name": "Wait1",
-                "type": "Wait",
-                "dependsOn": [],
-                "userProperties": [],
-                "typeProperties": {
-                    "waitTimeInSeconds": 1
-                }
-            }
-        ],
-        "annotations": [],
-        "lastPublishTime": "2021-06-21T19:41:42Z"
+    "name": "Copy data1",
+    "type": "Copy",
+    "dependsOn": [],
+    "policy": {
+        "timeout": "7.00:00:00",
+        "retry": 0,
+        "retryIntervalInSeconds": 30,
+        "secureOutput": false,
+        "secureInput": false
     },
-    "type": "Microsoft.DataFactory/factories/pipelines"
+    "userProperties": [],
+    "typeProperties": {
+        "enableStaging": false
+    }
 }]
 JSON
 }
