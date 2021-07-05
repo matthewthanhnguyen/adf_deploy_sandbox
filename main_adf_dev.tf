@@ -11,7 +11,7 @@ terraform {
 # Configure Microsoft Azure Provider
 provider "azurerm" {
   features {}
-  subscription_id		= var.subscription-id
+  subscription_id   = var.subscription-id
 }
 
 # Create resource group, name and location variables located in variables_adf_dev.tf
@@ -24,7 +24,7 @@ resource "azurerm_resource_group" "resource-group-dev" {
 
 # Create ADF stroage account, constants defined in varaibles_adf_dev.tf file
 resource "azurerm_storage_account" "adf_storage" {
-  name					   = "adfstorageal"
+  name                     = "adfstorageal"
   resource_group_name      = var.resource-group-dev
   location                 = var.resource-location
   account_tier             = "Standard"
@@ -1006,7 +1006,7 @@ resource "azurerm_template_deployment" "adf_terraform_arm_deployment" {
 }
 DEPLOY
 
-deployment_mode = "Incremental"
+deployment_mode = "Complete"
 }
 
 
