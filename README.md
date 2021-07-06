@@ -72,7 +72,7 @@ dbutils.fs.mount(
 
 TODO: Automate databricks secret scope creation, cluster creation, and storage mount
 
-## Machine Learning Industrialization Components
+## ReadMe for Machine Learning Industrialization Component
 
 ## main_adf_dev.tf
 Main document for setting up azure data factory terraform resources.
@@ -106,10 +106,10 @@ Datasets:
 - adfdssqlserver01: dataset for table/SQL server storage
 
 Dataflows:
-All dataflows currently using Terraform ARM template.
+All dataflows currently using Terraform ARM template.  
 Use deployment mode 'Incremental' to create dataflows in ADF
 - Aggregate Strings: After grouping by a specified column, aggregates all values from a field into a single string separated by commas. How to use: Populate the GroupByColumnName parameter to specify which column to group by and populate the AggregateColumnName parameter to combine the values into a single separated string. Update the source and sink reference datasets
-- Calculate Moving Average: "Calculates a 15 day moving average and rounds to two decimal places. How to use: Specify the KeyColumn to group by for example a stock ticker symbol. Specify the DateColumn to sort the dataset ascending. Specify the ValueColumn where the average will be performed on, this expects a double. Update the source and sink reference dataset.
+- Calculate Moving Average: Calculates a 15 day moving average and rounds to two decimal places. How to use: Specify the KeyColumn to group by for example a stock ticker symbol. Specify the DateColumn to sort the dataset ascending. Specify the ValueColumn where the average will be performed on, this expects a double. Update the source and sink reference dataset.
 - Check Null Columns: Identifies records where any column has a NULL value. How to use: Update the source and sink reference datasets
 - Count Distinct Rows: Returns the first occurrence of all distinct rows based on all column values. How to use: Update the source and sink reference datasets
 - Count Distinct Values: Aggregates the data to determine the number of distinct values for a specified field and the number of unique values for that field. How to use: Populate the ColumnName parameter to group by and the source and sink reference datasets
@@ -151,3 +151,5 @@ Defines common tags including consumer organization, environment type and suppor
 
 ## Archive folder
 Holds currently unused files, including PROD version files.  Also holds previous variable declarations, which has been duplicated over into variables_adf_dev.tf
+
+TODO: Update to use dataflow resources instead of ARM template resources
