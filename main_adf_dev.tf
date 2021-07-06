@@ -22,7 +22,7 @@ resource "azurerm_resource_group" "resource-group-dev" {
 
 ################################ Storage/Data Factory ################################
 
-# Create ADF stroage account, constants defined in varaibles_adf_dev.tf file
+# Create ADF storage account, constants defined in variables_adf_dev.tf file
 resource "azurerm_storage_account" "adf_storage" {
   name                     = "adfstorageal"
   resource_group_name      = var.resource-group-dev
@@ -136,12 +136,14 @@ resource "azurerm_key_vault" "vault" {
   tags = var.common_tags
 }
 
+/*
 # Configure key vault sercret
 resource "azurerm_key_vault_secret" "secret" {
   name = "${azurerm_storage_account.adf_storage.name}-key"
   value = azurerm_storage_account.adf_storage.primary_access_key
   key_vault_id = azurerm_key_vault.vault.id
 }
+*/
 
 # Get SAS token
 data "azurerm_storage_account_sas" "storage_sas_token" {
@@ -176,6 +178,7 @@ data "azurerm_storage_account_sas" "storage_sas_token" {
   }
 }
 
+/*
 # Store storage SAS token to key vault
 resource "azurerm_key_vault_secret" "token" {
   name = "${azurerm_storage_account.adf_storage.name}-token"
@@ -183,6 +186,7 @@ resource "azurerm_key_vault_secret" "token" {
   key_vault_id = azurerm_key_vault.vault.id
   expiration_date = "${var.sas_expire}T23:59:59Z"
 }
+*/
 
 ################################ Linked Services ################################
 ##### Linked Service for Blob/Datalake Storage #####
@@ -283,6 +287,28 @@ resource "azurerm_data_factory_dataset_delimited_text" "adf_ds_delimited_text_01
   null_value          = "NULL"
 }
 
+##### Datasource #####
+resource "azurerm_data_factory_dataset_delimited_text" "adf_ds_datasource" {
+  name                = "adfdsdatasource01"
+  resource_group_name = var.resource-group-dev
+  data_factory_name   = azurerm_data_factory.adf_test.name
+  linked_service_name = azurerm_data_factory_linked_service_web.adf_link_service_web.name
+
+  http_server_location {
+      relative_url = "http://www.google.com"    # To be defined
+      path         = "foo/bar/"                 # To be defined
+      filename     = "fizz.txt"                 # To be defined
+    }
+
+  column_delimiter    = ","
+  row_delimiter       = "NEW"
+  encoding            = "UTF-8"
+  quote_character     = "x"
+  escape_character    = "f"
+  first_row_as_header = true
+  null_value          = "NULL"
+}
+
 ##### Dataset for HTTP #####
 resource "azurerm_data_factory_dataset_http" "adf_ds_http_01" {
   name                = "adfdshttp01"
@@ -319,6 +345,428 @@ resource "azurerm_data_factory_dataset_sql_server_table" "adf_ds_sql_server_01" 
   linked_service_name = azurerm_data_factory_linked_service_sql_server.adf_link_sql_server.name
 }
 
+################################ ADF Dataflow ################################
+# Resource: Dataset datasource
+# Resource: Aggregate strings
+# Resource: Calculate moving average
+# Resource: Check null columns
+# Resource: Count distinct rows
+# Resource: Count distinct values - 
+# Resource: Impute fill down
+# Resource: Persist column data type - 
+# Resource: Remove duplicates
+# Resource: Summarize data - 
+# Resource: Remove non-alphanumeric
+# Descriptions for each resource outlined in properties/description of each dataflow
+
+# Azure Terraform ARM Deployment templates
+resource "azurerm_template_deployment" "adf_terraform_arm_deployment" {
+  name                = "adfterraformarmdeployment"
+  resource_group_name = var.resource-group-dev
+  template_body = <<DEPLOY
+{
+  "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "factoryName": {
+      "type": "string",
+      "metadata": "Data Factory name",
+      "defaultValue": "adftestal"
+    }
+  },
+  "variables": {
+        "factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+  },
+  "resources": [
+    {
+      "name": "[concat(parameters('factoryName'), '/AggregateStrings')]",
+      "type": "Microsoft.DataFactory/factories/dataflows",
+      "apiVersion": "2018-06-01",
+      "properties": {
+        "description": "After grouping by a specified column, aggregates all values from a field into a single string separated by commas.\nHow to use:\nPopulate the GroupByColumnName parameter to specify which column to group by and populate the AggregateColumnName parameter to combine the values into a single separated string. Update the source and sink reference datasets.",
+        "type": "MappingDataFlow",
+        "typeProperties": {
+          "sources": [
+            {
+              "dataset": {
+                "referenceName": "adfdsdatasource01",
+                "type": "DatasetReference"
+              },
+              "name": "source1"
+            }
+          ],
+          "sinks": [
+            {
+              "dataset": {
+                "referenceName": "adfdsdatasource01",
+                "type": "DatasetReference"
+              },
+              "name": "sink1"
+            }
+          ],
+          "transformations": [
+            {
+              "name": "Aggregate1"
+            },
+            {
+              "name": "StringAgg"
+            }
+          ],
+          "script": "parameters{\n\tGroupByColumnName as string,\n\tAggregateColumnName as string\n}\nsource(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> source1\nsource1 aggregate(groupBy(GroupByColumnName = $GroupByColumnName),\n\tstring_agg = collect($AggregateColumnName)) ~> Aggregate1\nAggregate1 derive(string_agg = toString(string_agg)) ~> StringAgg\nStringAgg sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sink1"
+        }
+      }
+    },
+    {
+      "name": "[concat(parameters('factoryName'), '/CalculateMovingAverage')]",
+      "type": "Microsoft.DataFactory/factories/dataflows",
+      "apiVersion": "2018-06-01",
+      "properties": {
+        "description": "Calculates a 15 day moving average and rounds to two decimal places.\nHow to use:\n1. Specify the KeyColumn to group by for example a stock ticker symbol.\n2. Specify the DateColumn to sort the dataset ascending\n3. Specify the ValueColumn where the average will be performed on, this expects a double.\n4. Update the source and sink reference dataset.\n",
+        "type": "MappingDataFlow",
+        "typeProperties": {
+          "sources": [
+            {
+              "dataset": {
+                "referenceName": "adfdsdatasource01",
+                "type": "DatasetReference"
+              },
+              "name": "source1"
+            }
+          ],
+          "sinks": [
+            {
+              "dataset": {
+                "referenceName": "adfdsdatasource01",
+                "type": "DatasetReference"
+              },
+              "name": "sink1"
+            }
+          ],
+          "transformations": [
+            {
+              "name": "Window1"
+            }
+          ],
+          "script": "parameters{\n\tKeyColumn as string,\n\tDateColumn as date,\n\tValueColumn as double\n}\nsource(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> source1\nsource1 window(over(MovingAverageColumn = $KeyColumn),\n\tasc($DateColumn, true),\n\tstartRowOffset: -7L,\n\tendRowOffset: 7L,\n\tFifteenDayMovingAvg = round(avg($ValueColumn),2)) ~> Window1\nWindow1 sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sink1"
+        }
+      }
+    },
+    {
+      "name": "[concat(parameters('factoryName'), '/CheckNullColumns')]",
+      "type": "Microsoft.DataFactory/factories/dataflows",
+      "apiVersion": "2018-06-01",
+      "properties": {
+        "description": "Identifies records where any column has a NULL value.\nHow to use:\nUpdate the source and sink reference datasets.",
+        "type": "MappingDataFlow",
+        "typeProperties": {
+          "sources": [
+            {
+              "dataset": {
+                "referenceName": "adfdsdatasource01",
+                "type": "DatasetReference"
+              },
+              "name": "source1"
+            }
+          ],
+          "sinks": [
+            {
+              "dataset": {
+                "referenceName": "adfdsdatasource01",
+                "type": "DatasetReference"
+              },
+              "name": "sink1"
+            }
+          ],
+          "transformations": [
+            {
+              "name": "LookForNULLs"
+            }
+          ],
+          "script": "source(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> source1\nsource1 split(contains(array(columns()),isNull(#item)),\n\tdisjoint: false) ~> LookForNULLs@(hasNULLs, noNULLs)\nLookForNULLs@hasNULLs sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sink1"
+        }
+      }
+    },
+    {
+      "name": "[concat(parameters('factoryName'), '/CountDistinctRows')]",
+      "type": "Microsoft.DataFactory/factories/dataflows",
+      "apiVersion": "2018-06-01",
+      "properties": {
+        "description": "Returns the first occurrence of all distinct rows based on all column values.\nHow to use:\nUpdate the source and sink reference datasets.",
+        "type": "MappingDataFlow",
+        "typeProperties": {
+          "sources": [
+            {
+              "dataset": {
+                "referenceName": "adfdsdatasource01",
+                "type": "DatasetReference"
+              },
+              "name": "source1"
+            }
+          ],
+          "sinks": [
+            {
+              "dataset": {
+                "referenceName": "adfdsdatasource01",
+                "type": "DatasetReference"
+              },
+              "name": "sink1"
+            }
+          ],
+          "transformations": [
+            {
+              "name": "DistinctRows"
+            }
+          ],
+          "script": "source(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> source1\nsource1 aggregate(groupBy(mycols = sha2(256,columns())),\n\teach(match(true()), $$ = first($$))) ~> DistinctRows\nDistinctRows sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sink1"
+        }
+      }
+    },
+    {
+      "name": "[concat(parameters('factoryName'), '/CountDistinctValues')]",
+      "type": "Microsoft.DataFactory/factories/dataflows",
+      "apiVersion": "2018-06-01",
+      "properties": {
+        "description": "Aggregates the data to determine the number of distinct values for a specified field and the number of unique values for that field.\nHow to use:\nPopulate the ColumnName parameter to group by and the source and sink reference datasets.",
+        "type": "MappingDataFlow",
+        "typeProperties": {
+          "sources": [
+            {
+              "dataset": {
+                "referenceName": "adfdsdatasource01",
+                "type": "DatasetReference"
+              },
+              "name": "source1"
+            }
+          ],
+          "sinks": [
+            {
+              "dataset": {
+                "referenceName": "adfdsdatasource01",
+                "type": "DatasetReference"
+              },
+              "name": "sink1"
+            }
+          ],
+          "transformations": [
+            {
+              "name": "ValueDistAgg"
+            },
+            {
+              "name": "UniqDist"
+            }
+          ],
+          "script": "parameters{\n\tColumnName as string\n}\nsource(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> source1\nsource1 aggregate(groupBy(GroupByFieldName = $ColumnName),\n\tcountunique = count()) ~> ValueDistAgg\nValueDistAgg aggregate(numofunique = countIf(countunique==1),\n\t\tnumofdistinct = countDistinct($ColumnName)) ~> UniqDist\nUniqDist sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sink1"
+        }
+      }
+    },
+    {
+      "name": "[concat(parameters('factoryName'), '/ImputeFillDown')]",
+      "type": "Microsoft.DataFactory/factories/dataflows",
+      "apiVersion": "2018-06-01",
+      "properties": {
+        "description": "Replace NULL values with the values from the previous non-NULL value in the sequence.\nHow to use:\nUpdate the SortByColumnName parameter with the column to sequence the dataset.\nSpecify the FillColumnName to be imputed with the last known value.\nUpdate the source and sink reference datasets",
+        "type": "MappingDataFlow",
+        "typeProperties": {
+          "sources": [
+            {
+              "dataset": {
+                "referenceName": "adfdsdatasource01",
+                "type": "DatasetReference"
+              },
+              "name": "source1"
+            }
+          ],
+          "sinks": [
+            {
+              "dataset": {
+                "referenceName": "adfdsdatasource01",
+                "type": "DatasetReference"
+              },
+              "name": "sink1"
+            }
+          ],
+          "transformations": [
+            {
+              "name": "DerivedColumn"
+            },
+            {
+              "name": "SurrogateKey"
+            },
+            {
+              "name": "Window1"
+            },
+            {
+              "name": "Sort1"
+            }
+          ],
+          "script": "parameters{\n\tFillColumnName as string,\n\tSortByColumnName as string\n}\nsource(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> source1\nSort1 derive(dummy = 1) ~> DerivedColumn\nDerivedColumn keyGenerate(output(sk as long),\n\tstartAt: 1L) ~> SurrogateKey\nSurrogateKey window(over(dummy),\n\tasc(sk, true),\n\tFilledColumn = coalesce($FillColumnName, last($FillColumnName, true()))) ~> Window1\nsource1 sort(asc($SortByColumnName, true)) ~> Sort1\nWindow1 sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sink1"
+        }
+      }
+    },
+    {
+      "name": "[concat(parameters('factoryName'), '/PersistColumnDataTypes')]",
+      "type": "Microsoft.DataFactory/factories/dataflows",
+      "apiVersion": "2018-06-01",
+      "properties": {
+        "description": "Generates the data type of each column to persist to a data store.\nHow to use:\nUpdate the source and sink reference datasets.",
+        "type": "MappingDataFlow",
+        "typeProperties": {
+          "sources": [
+            {
+              "dataset": {
+                "referenceName": "adfdsdatasource01",
+                "type": "DatasetReference"
+              },
+              "name": "source1"
+            }
+          ],
+          "sinks": [
+            {
+              "dataset": {
+                "referenceName": "adfdsdatasource01",
+                "type": "DatasetReference"
+              },
+              "name": "sink1"
+            }
+          ],
+          "transformations": [
+            {
+              "name": "DerivedColumn1"
+            }
+          ],
+          "script": "source(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> source1\nsource1 derive(each(match(type=='string'), $$ = 'string'),\n\t\teach(match(type=='integer'), $$ = 'integer'),\n\t\teach(match(type=='short'), $$ = 'short'),\n\t\teach(match(type=='complex'), $$ = 'complex'),\n\t\teach(match(type=='array'), $$ = 'array'),\n\t\teach(match(type=='float'), $$ = 'float'),\n\t\teach(match(type=='date'), $$ = 'date'),\n\t\teach(match(type=='timestamp'), $$ = 'timestamp'),\n\t\teach(match(type=='boolean'), $$ = 'boolean'),\n\t\teach(match(type=='long'), $$ = 'long'),\n\t\teach(match(type=='double'), $$ = 'double')) ~> DerivedColumn1\nDerivedColumn1 sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sink1"
+        }
+      }
+    },
+    {
+      "name": "[concat(parameters('factoryName'), '/RemoveDuplicates')]",
+      "type": "Microsoft.DataFactory/factories/dataflows",
+      "apiVersion": "2018-06-01",
+      "properties": {
+        "description": "Remove duplicates and returns the first instance for all records\nHow to use:\nFill in the ColumnName Parameter with the field to group by and update the source and sink reference datasets.",
+        "type": "MappingDataFlow",
+        "typeProperties": {
+          "sources": [
+            {
+              "dataset": {
+                "referenceName": "adfdsdatasource01",
+                "type": "DatasetReference"
+              },
+              "name": "source1"
+            }
+          ],
+          "sinks": [
+            {
+              "dataset": {
+                "referenceName": "adfdsdatasource01",
+                "type": "DatasetReference"
+              },
+              "name": "sink1"
+            }
+          ],
+          "transformations": [
+            {
+              "name": "RemoveDuplicates"
+            }
+          ],
+          "script": "parameters{\n\tColumnName as string\n}\nsource(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> source1\nsource1 aggregate(groupBy(GroupByFieldName = $ColumnName),\n\teach(match(name!=$ColumnName), $$ = first($$))) ~> RemoveDuplicates\nRemoveDuplicates sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sink1"
+        }
+      }
+    },
+    {
+      "name": "[concat(parameters('factoryName'), '/SummarizeData')]",
+      "type": "Microsoft.DataFactory/factories/dataflows",
+      "apiVersion": "2018-06-01",
+      "properties": {
+        "description": "Profiles the data by: \n1. Counting the number of nulls and non null records\n2. Aggregating columns to calculate the stddev, min, max, avg and variance\n3. Length of the columns which are type string\nHow to use:\nUpdate the source and sink reference datasets",
+        "type": "MappingDataFlow",
+        "typeProperties": {
+          "sources": [
+            {
+              "dataset": {
+                "referenceName": "adfdsdatasource01",
+                "type": "DatasetReference"
+              },
+              "name": "source1"
+            }
+          ],
+          "sinks": [
+            {
+              "dataset": {
+                "referenceName": "adfdsdatasource01",
+                "type": "DatasetReference"
+              },
+              "name": "sink1"
+            }
+          ],
+          "transformations": [
+            {
+              "name": "SummaryStats"
+            }
+          ],
+          "script": "source(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> source1\nsource1 aggregate(each(match(true()), $$+'_NotNull' = countIf(!isNull($$)), $$ + '_Null' = countIf(isNull($$))),\n\t\teach(match(type=='double'||type=='integer'||type=='short'||type=='decimal'), $$+'_stddev' = round(stddev($$),2), $$ + '_min' = min ($$), $$ + '_max' = max($$), $$ + '_average' = round(avg($$),2), $$ + '_variance' = round(variance($$),2)),\n\t\teach(match(type=='string'), $$+'_maxLength' = max(length($$)))) ~> SummaryStats\nSummaryStats sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sink1"
+        }
+      }
+    },
+    {
+      "name": "[concat(parameters('factoryName'), '/RemoveNonAlphanumeric')]",
+      "type": "Microsoft.DataFactory/factories/dataflows",
+      "apiVersion": "2018-06-01",
+      "properties": {
+        "description": "Removes ^a-zA-Z\\d\\s: symbols from all fields\nHow to use:\nEither apply the transformation on all columns in the dataset or provide the column name to be transform through the ColumnName parameter. Update the source and sink datasets.",
+        "type": "MappingDataFlow",
+        "typeProperties": {
+          "sources": [
+            {
+              "dataset": {
+                "referenceName": "adfdsdatasource01",
+                "type": "DatasetReference"
+              },
+              "name": "source1"
+            },
+            {
+              "dataset": {
+                "referenceName": "adfdsdatasource01",
+                "type": "DatasetReference"
+              },
+              "name": "source2"
+            }
+          ],
+          "sinks": [
+            {
+              "dataset": {
+                "referenceName": "adfdsdatasource01",
+                "type": "DatasetReference"
+              },
+              "name": "sink1"
+            },
+            {
+              "dataset": {
+                "referenceName": "adfdsdatasource01",
+                "type": "DatasetReference"
+              },
+              "name": "sink2"
+            }
+          ],
+          "transformations": [
+            {
+              "name": "AllColumns"
+            },
+            {
+              "name": "OneColumn"
+            }
+          ],
+          "script": "parameters{\n\tColumnName as string\n}\nsource(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> source1\nsource(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> source2\nsource1 derive(each(match(true()), $$ = regexReplace($$,`^a-zA-Z\\d\\s:`,''))) ~> AllColumns\nsource2 derive(each(match(name==$ColumnName), $$ = regexReplace($$,`^a-zA-Z\\d\\s:`,''))) ~> OneColumn\nAllColumns sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sink1\nOneColumn sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sink2"
+        }
+      }
+    }
+]
+}
+DEPLOY
+
+deployment_mode = "Incremental"
+}
 
 ################################ Pipelines with JSON ################################
 
@@ -418,6 +866,60 @@ activities_json = <<JSON
 JSON
 }
 
+##### Pipeline to Copy New Files by Last Modified Date #####
+resource "azurerm_data_factory_pipeline" "adf_pipeline_copy_new_files_by_last_modified" {
+  name                = "adfpipelinecopynewfilesbylastmodified"
+  resource_group_name = var.resource-group-dev
+  data_factory_name   = azurerm_data_factory.adf_test.name
+
+activities_json = <<JSON
+[
+  {
+    "name": "CopyNewFiles",
+    "description": "Copy new and changed files only by using LastModifiedDate",
+    "type": "Copy",
+    "dependsOn": [],
+    "policy": {
+        "timeout": "7.00:00:00",
+        "retry": 0,
+        "retryIntervalInSeconds": 30,
+        "secureOutput": false,
+        "secureInput": false
+    },
+    "userProperties": [],
+    "typeProperties": {
+        "source": {
+            "type": "BinarySource",
+            "storeSettings": {
+                "type": "AzureBlobStorageReadSettings",
+                "recursive": true,
+                "modifiedDatetimeStart": {
+                    "value": "",
+                    "type": "Expression"
+                },
+                "modifiedDatetimeEnd": {
+                    "value": "",
+                    "type": "Expression"
+                },
+                "wildcardFileName": {
+                    "value": "*",
+                    "type": "Expression"
+                }
+            }
+        },
+        "sink": {
+            "type": "BinarySink",
+            "storeSettings": {
+                "type": "AzureBlobFSWriteSettings"
+            }
+        },
+        "enableStaging": false
+    }
+  }
+]
+JSON
+}
+
 ##### Pipeline to Copy Data and Execute Dataflow to Remove Alphanumeric Characters #####
 resource "azurerm_data_factory_pipeline" "adf_pipeline_remove_alphanumeric" {
   name                = "adfpipelineremovealphanumeric"
@@ -496,60 +998,6 @@ activities_json = <<JSON
 JSON
 }
 
-##### Pipeline to Copy New Files by Last Modified Date #####
-resource "azurerm_data_factory_pipeline" "adf_pipeline_copy_new_files_by_last_modified" {
-  name                = "adfpipelinecopynewfilesbylastmodified"
-  resource_group_name = var.resource-group-dev
-  data_factory_name   = azurerm_data_factory.adf_test.name
-
-activities_json = <<JSON
-[
-  {
-    "name": "CopyNewFiles",
-    "description": "Copy new and changed files only by using LastModifiedDate",
-    "type": "Copy",
-    "dependsOn": [],
-    "policy": {
-        "timeout": "7.00:00:00",
-        "retry": 0,
-        "retryIntervalInSeconds": 30,
-        "secureOutput": false,
-        "secureInput": false
-    },
-    "userProperties": [],
-    "typeProperties": {
-        "source": {
-            "type": "BinarySource",
-            "storeSettings": {
-                "type": "AzureBlobStorageReadSettings",
-                "recursive": true,
-                "modifiedDatetimeStart": {
-                    "value": "",
-                    "type": "Expression"
-                },
-                "modifiedDatetimeEnd": {
-                    "value": "",
-                    "type": "Expression"
-                },
-                "wildcardFileName": {
-                    "value": "*",
-                    "type": "Expression"
-                }
-            }
-        },
-        "sink": {
-            "type": "BinarySink",
-            "storeSettings": {
-                "type": "AzureBlobFSWriteSettings"
-            }
-        },
-        "enableStaging": false
-    }
-  }
-]
-JSON
-}
-
 ###### Trigger Schedule #####
 resource "azurerm_data_factory_trigger_schedule" "adf_trigger_schedule" {
   name                = "adftriggerschedule"
@@ -560,455 +1008,6 @@ resource "azurerm_data_factory_trigger_schedule" "adf_trigger_schedule" {
   interval  = 5
   frequency = "Day"
 }
-
-################################ ADF Dataflow ################################
-# Resource: Dataset datasource
-# Resource: Aggregate strings
-# Resource: Calculate moving average
-# Resource: Check null columns
-# Resource: Count distinct rows
-# Resource: Count distinct values
-# Resource: Impute fill down
-# Resource: Persist column data type
-# Resource: Remove duplicates
-# Resource: Summarize data
-# Resource: Remove non-alphanumeric
-# Descriptions for each resource outlined in properties/description of each dataflow
-
-# Azure Terraform ARM Deployment templates
-resource "azurerm_template_deployment" "adf_terraform_arm_deployment" {
-  name                = "adfterraformarmdeployment"
-  resource_group_name = var.resource-group-dev
-
-  template_body = <<DEPLOY
-{
-  "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
-
-  "contentVersion": "1.0.0.0",
-  "parameters": {
-    "factoryName": {
-      "type": "string",
-      "metadata": "Data Factory name",
-      "defaultValue": "adftestal"
-    }
-  },
-  "variables": {
-        "factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
-  },
-  "resources": [
-    {
-      "name": "[concat(parameters('factoryName'), '/datasource')]",
-      "type": "Microsoft.DataFactory/factories/datasets",
-      "apiVersion": "2018-06-01",
-      "properties": {
-        "linkedServiceName": {
-          "referenceName": "adfbloblink01",
-          "type": "LinkedServiceReference"
-        },
-        "annotations": [],
-        "type": "DelimitedText",
-        "typeProperties": {
-          "columnDelimiter": ",",
-          "escapeChar": "\\",
-          "firstRowAsHeader": true,
-          "quoteChar": "\""
-        },
-        "schema": []
-      },
-      "dependsOn": []
-    },
-    {
-      "name": "[concat(parameters('factoryName'), '/AggregateStrings')]",
-      "type": "Microsoft.DataFactory/factories/dataflows",
-      "apiVersion": "2018-06-01",
-      "properties": {
-        "description": "After grouping by a specified column, aggregates all values from a field into a single string separated by commas.\nHow to use:\nPopulate the GroupByColumnName parameter to specify which column to group by and populate the AggregateColumnName parameter to combine the values into a single separated string. Update the source and sink reference datasets.",
-        "type": "MappingDataFlow",
-        "typeProperties": {
-          "sources": [
-            {
-              "dataset": {
-                "referenceName": "datasource",
-                "type": "DatasetReference"
-              },
-              "name": "source1"
-            }
-          ],
-          "sinks": [
-            {
-              "dataset": {
-                "referenceName": "datasource",
-                "type": "DatasetReference"
-              },
-              "name": "sink1"
-            }
-          ],
-          "transformations": [
-            {
-              "name": "Aggregate1"
-            },
-            {
-              "name": "StringAgg"
-            }
-          ],
-          "script": "parameters{\n\tGroupByColumnName as string,\n\tAggregateColumnName as string\n}\nsource(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> source1\nsource1 aggregate(groupBy(GroupByColumnName = $GroupByColumnName),\n\tstring_agg = collect($AggregateColumnName)) ~> Aggregate1\nAggregate1 derive(string_agg = toString(string_agg)) ~> StringAgg\nStringAgg sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sink1"
-        }
-      }
-    },
-    {
-      "name": "[concat(parameters('factoryName'), '/CalculateMovingAverage')]",
-      "type": "Microsoft.DataFactory/factories/dataflows",
-      "apiVersion": "2018-06-01",
-      "properties": {
-        "description": "Calculates a 15 day moving average and rounds to two decimal places.\nHow to use:\n1. Specify the KeyColumn to group by for example a stock ticker symbol.\n2. Specify the DateColumn to sort the dataset ascending\n3. Specify the ValueColumn where the average will be performed on, this expects a double.\n4. Update the source and sink reference dataset.\n",
-        "type": "MappingDataFlow",
-        "typeProperties": {
-          "sources": [
-            {
-              "dataset": {
-                "referenceName": "datasource",
-                "type": "DatasetReference"
-              },
-              "name": "source1"
-            }
-          ],
-          "sinks": [
-            {
-              "dataset": {
-                "referenceName": "datasource",
-                "type": "DatasetReference"
-              },
-              "name": "sink1"
-            }
-          ],
-          "transformations": [
-            {
-              "name": "Window1"
-            }
-          ],
-          "script": "parameters{\n\tKeyColumn as string,\n\tDateColumn as date,\n\tValueColumn as double\n}\nsource(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> source1\nsource1 window(over(MovingAverageColumn = $KeyColumn),\n\tasc($DateColumn, true),\n\tstartRowOffset: -7L,\n\tendRowOffset: 7L,\n\tFifteenDayMovingAvg = round(avg($ValueColumn),2)) ~> Window1\nWindow1 sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sink1"
-        }
-      }
-    },
-    {
-      "name": "[concat(parameters('factoryName'), '/CheckNullColumns')]",
-      "type": "Microsoft.DataFactory/factories/dataflows",
-      "apiVersion": "2018-06-01",
-      "properties": {
-        "description": "Identifies records where any column has a NULL value.\nHow to use:\nUpdate the source and sink reference datasets.",
-        "type": "MappingDataFlow",
-        "typeProperties": {
-          "sources": [
-            {
-              "dataset": {
-                "referenceName": "datasource",
-                "type": "DatasetReference"
-              },
-              "name": "source1"
-            }
-          ],
-          "sinks": [
-            {
-              "dataset": {
-                "referenceName": "datasource",
-                "type": "DatasetReference"
-              },
-              "name": "sink1"
-            }
-          ],
-          "transformations": [
-            {
-              "name": "LookForNULLs"
-            }
-          ],
-          "script": "source(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> source1\nsource1 split(contains(array(columns()),isNull(#item)),\n\tdisjoint: false) ~> LookForNULLs@(hasNULLs, noNULLs)\nLookForNULLs@hasNULLs sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sink1"
-        }
-      }
-    },
-    {
-      "name": "[concat(parameters('factoryName'), '/CountDistinctRows')]",
-      "type": "Microsoft.DataFactory/factories/dataflows",
-      "apiVersion": "2018-06-01",
-      "properties": {
-        "description": "Returns the first occurrence of all distinct rows based on all column values.\nHow to use:\nUpdate the source and sink reference datasets.",
-        "type": "MappingDataFlow",
-        "typeProperties": {
-          "sources": [
-            {
-              "dataset": {
-                "referenceName": "datasource",
-                "type": "DatasetReference"
-              },
-              "name": "source1"
-            }
-          ],
-          "sinks": [
-            {
-              "dataset": {
-                "referenceName": "datasource",
-                "type": "DatasetReference"
-              },
-              "name": "sink1"
-            }
-          ],
-          "transformations": [
-            {
-              "name": "DistinctRows"
-            }
-          ],
-          "script": "source(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> source1\nsource1 aggregate(groupBy(mycols = sha2(256,columns())),\n\teach(match(true()), $$ = first($$))) ~> DistinctRows\nDistinctRows sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sink1"
-        }
-      }
-    },
-    {
-      "name": "[concat(parameters('factoryName'), '/CountDistinctValues')]",
-      "type": "Microsoft.DataFactory/factories/dataflows",
-      "apiVersion": "2018-06-01",
-      "properties": {
-        "description": "Aggregates the data to determine the number of distinct values for a specified field and the number of unique values for that field.\nHow to use:\nPopulate the ColumnName parameter to group by and the source and sink reference datasets.",
-        "type": "MappingDataFlow",
-        "typeProperties": {
-          "sources": [
-            {
-              "dataset": {
-                "referenceName": "datasource",
-                "type": "DatasetReference"
-              },
-              "name": "source1"
-            }
-          ],
-          "sinks": [
-            {
-              "dataset": {
-                "referenceName": "datasource",
-                "type": "DatasetReference"
-              },
-              "name": "sink1"
-            }
-          ],
-          "transformations": [
-            {
-              "name": "ValueDistAgg"
-            },
-            {
-              "name": "UniqDist"
-            }
-          ],
-          "script": "parameters{\n\tColumnName as string\n}\nsource(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> source1\nsource1 aggregate(groupBy(GroupByFieldName = $ColumnName),\n\tcountunique = count()) ~> ValueDistAgg\nValueDistAgg aggregate(numofunique = countIf(countunique==1),\n\t\tnumofdistinct = countDistinct($ColumnName)) ~> UniqDist\nUniqDist sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sink1"
-        }
-      }
-    },
-    {
-      "name": "[concat(parameters('factoryName'), '/ImputeFillDown')]",
-      "type": "Microsoft.DataFactory/factories/dataflows",
-      "apiVersion": "2018-06-01",
-      "properties": {
-        "description": "Replace NULL values with the values from the previous non-NULL value in the sequence.\nHow to use:\nUpdate the SortByColumnName parameter with the column to sequence the dataset.\nSpecify the FillColumnName to be imputed with the last known value.\nUpdate the source and sink reference datasets",
-        "type": "MappingDataFlow",
-        "typeProperties": {
-          "sources": [
-            {
-              "dataset": {
-                "referenceName": "datasource",
-                "type": "DatasetReference"
-              },
-              "name": "source1"
-            }
-          ],
-          "sinks": [
-            {
-              "dataset": {
-                "referenceName": "datasource",
-                "type": "DatasetReference"
-              },
-              "name": "sink1"
-            }
-          ],
-          "transformations": [
-            {
-              "name": "DerivedColumn"
-            },
-            {
-              "name": "SurrogateKey"
-            },
-            {
-              "name": "Window1"
-            },
-            {
-              "name": "Sort1"
-            }
-          ],
-          "script": "parameters{\n\tFillColumnName as string,\n\tSortByColumnName as string\n}\nsource(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> source1\nSort1 derive(dummy = 1) ~> DerivedColumn\nDerivedColumn keyGenerate(output(sk as long),\n\tstartAt: 1L) ~> SurrogateKey\nSurrogateKey window(over(dummy),\n\tasc(sk, true),\n\tFilledColumn = coalesce($FillColumnName, last($FillColumnName, true()))) ~> Window1\nsource1 sort(asc($SortByColumnName, true)) ~> Sort1\nWindow1 sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sink1"
-        }
-      }
-    },
-    {
-      "name": "[concat(parameters('factoryName'), '/PersistColumnDataTypes')]",
-      "type": "Microsoft.DataFactory/factories/dataflows",
-      "apiVersion": "2018-06-01",
-      "properties": {
-        "description": "Generates the data type of each column to persist to a data store.\nHow to use:\nUpdate the source and sink reference datasets.",
-        "type": "MappingDataFlow",
-        "typeProperties": {
-          "sources": [
-            {
-              "dataset": {
-                "referenceName": "datasource",
-                "type": "DatasetReference"
-              },
-              "name": "source1"
-            }
-          ],
-          "sinks": [
-            {
-              "dataset": {
-                "referenceName": "datasource",
-                "type": "DatasetReference"
-              },
-              "name": "sink1"
-            }
-          ],
-          "transformations": [
-            {
-              "name": "DerivedColumn1"
-            }
-          ],
-          "script": "source(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> source1\nsource1 derive(each(match(type=='string'), $$ = 'string'),\n\t\teach(match(type=='integer'), $$ = 'integer'),\n\t\teach(match(type=='short'), $$ = 'short'),\n\t\teach(match(type=='complex'), $$ = 'complex'),\n\t\teach(match(type=='array'), $$ = 'array'),\n\t\teach(match(type=='float'), $$ = 'float'),\n\t\teach(match(type=='date'), $$ = 'date'),\n\t\teach(match(type=='timestamp'), $$ = 'timestamp'),\n\t\teach(match(type=='boolean'), $$ = 'boolean'),\n\t\teach(match(type=='long'), $$ = 'long'),\n\t\teach(match(type=='double'), $$ = 'double')) ~> DerivedColumn1\nDerivedColumn1 sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sink1"
-        }
-      }
-    },
-    {
-      "name": "[concat(parameters('factoryName'), '/RemoveDuplicates')]",
-      "type": "Microsoft.DataFactory/factories/dataflows",
-      "apiVersion": "2018-06-01",
-      "properties": {
-        "description": "Remove duplicates and returns the first instance for all records\nHow to use:\nFill in the ColumnName Parameter with the field to group by and update the source and sink reference datasets.",
-        "type": "MappingDataFlow",
-        "typeProperties": {
-          "sources": [
-            {
-              "dataset": {
-                "referenceName": "datasource",
-                "type": "DatasetReference"
-              },
-              "name": "source1"
-            }
-          ],
-          "sinks": [
-            {
-              "dataset": {
-                "referenceName": "datasource",
-                "type": "DatasetReference"
-              },
-              "name": "sink1"
-            }
-          ],
-          "transformations": [
-            {
-              "name": "RemoveDuplicates"
-            }
-          ],
-          "script": "parameters{\n\tColumnName as string\n}\nsource(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> source1\nsource1 aggregate(groupBy(GroupByFieldName = $ColumnName),\n\teach(match(name!=$ColumnName), $$ = first($$))) ~> RemoveDuplicates\nRemoveDuplicates sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sink1"
-        }
-      }
-    },
-    {
-      "name": "[concat(parameters('factoryName'), '/SummarizeData')]",
-      "type": "Microsoft.DataFactory/factories/dataflows",
-      "apiVersion": "2018-06-01",
-      "properties": {
-        "description": "Profiles the data by: \n1. Counting the number of nulls and non null records\n2. Aggregating columns to calculate the stddev, min, max, avg and variance\n3. Length of the columns which are type string\nHow to use:\nUpdate the source and sink reference datasets",
-        "type": "MappingDataFlow",
-        "typeProperties": {
-          "sources": [
-            {
-              "dataset": {
-                "referenceName": "datasource",
-                "type": "DatasetReference"
-              },
-              "name": "source1"
-            }
-          ],
-          "sinks": [
-            {
-              "dataset": {
-                "referenceName": "datasource",
-                "type": "DatasetReference"
-              },
-              "name": "sink1"
-            }
-          ],
-          "transformations": [
-            {
-              "name": "SummaryStats"
-            }
-          ],
-          "script": "source(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> source1\nsource1 aggregate(each(match(true()), $$+'_NotNull' = countIf(!isNull($$)), $$ + '_Null' = countIf(isNull($$))),\n\t\teach(match(type=='double'||type=='integer'||type=='short'||type=='decimal'), $$+'_stddev' = round(stddev($$),2), $$ + '_min' = min ($$), $$ + '_max' = max($$), $$ + '_average' = round(avg($$),2), $$ + '_variance' = round(variance($$),2)),\n\t\teach(match(type=='string'), $$+'_maxLength' = max(length($$)))) ~> SummaryStats\nSummaryStats sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sink1"
-        }
-      }
-    },
-    {
-      "name": "[concat(parameters('factoryName'), '/RemoveNonAlphanumeric')]",
-      "type": "Microsoft.DataFactory/factories/dataflows",
-      "apiVersion": "2018-06-01",
-      "properties": {
-        "description": "Removes ^a-zA-Z\\d\\s: symbols from all fields",
-        "type": "MappingDataFlow",
-        "typeProperties": {
-          "sources": [
-            {
-              "dataset": {
-                "referenceName": "datasource",
-                "type": "DatasetReference"
-              },
-              "name": "source1"
-            },
-            {
-              "dataset": {
-                "referenceName": "datasource",
-                "type": "DatasetReference"
-            },
-            "name": "source2"
-      }
-          ],
-          "sinks": [
-            {
-              "dataset": {
-                "referenceName": "datasource",
-                "type": "DatasetReference"
-              },
-              "name": "sink1"
-            },
-            {
-              "dataset": {
-                "referenceName": "datasource",
-                "type": "DatasetReference"
-              },
-              "name": "sink2"
-            }
-          ],
-          "transformations": [
-            {
-              "name": "AllColumns"
-            },
-            {
-              "name": "OneColumn"
-            }
-          ],
-          "script": "parameters{\n\tColumnName as string\n}\nsource(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> source1\nsource(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> source2\nsource1 derive(each(match(true()), $$ = regexReplace($$,`^a-zA-Z\\d\\s:`,''))) ~> AllColumns\nsource2 derive(each(match(name == $ColumnName), $$ = regexReplace($$,`^a-zA-Z\\d\\s:`,''))) ~> OneColumn\nAllColumns sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sink1\nOneColumn sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sink2"
-        }
-    },
-    "dependsOn": [
-        "[concat(variables('factoryId'), '/datasets/datasource')]"
-      ]
-    }
-]
-}
-DEPLOY
-
-deployment_mode = "Complete"
-}
-
 
 ################################## UNUSED #####################################
 /*
