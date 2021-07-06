@@ -72,7 +72,7 @@ dbutils.fs.mount(
 
 TODO: Automate databricks secret scope creation, cluster creation, and storage mount
 
-## ReadMe for Machine Learning Industrialization Component
+## Machine Learning Industrialization Components
 
 ## main_adf_dev.tf
 Main document for setting up azure data factory terraform resources.
@@ -141,7 +141,7 @@ All variables are defined within this file including:
 ## terraform.tfvars
 Configures region to be Canada Central.
 Sets the SAS start and expire dates, currently 2020-03-11 and 2028-03-11 respectively.
-Defintes common tags including consumer organization, environment type and support status.
+Defines common tags including consumer organization, environment type and support status.
 
 ## terraform.tfstate
 - File automatically updated during every terraform plan and apply run
