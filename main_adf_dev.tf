@@ -351,11 +351,11 @@ resource "azurerm_data_factory_dataset_sql_server_table" "adf_ds_sql_server_01" 
 # Resource: Calculate moving average
 # Resource: Check null columns
 # Resource: Count distinct rows
-# Resource: Count distinct values - 
+# Resource: Count distinct values
 # Resource: Impute fill down
-# Resource: Persist column data type - 
+# Resource: Persist column data type
 # Resource: Remove duplicates
-# Resource: Summarize data - 
+# Resource: Summarize data
 # Resource: Remove non-alphanumeric
 # Descriptions for each resource outlined in properties/description of each dataflow
 
@@ -866,60 +866,6 @@ activities_json = <<JSON
 JSON
 }
 
-##### Pipeline to Copy New Files by Last Modified Date #####
-resource "azurerm_data_factory_pipeline" "adf_pipeline_copy_new_files_by_last_modified" {
-  name                = "adfpipelinecopynewfilesbylastmodified"
-  resource_group_name = var.resource-group-dev
-  data_factory_name   = azurerm_data_factory.adf_test.name
-
-activities_json = <<JSON
-[
-  {
-    "name": "CopyNewFiles",
-    "description": "Copy new and changed files only by using LastModifiedDate",
-    "type": "Copy",
-    "dependsOn": [],
-    "policy": {
-        "timeout": "7.00:00:00",
-        "retry": 0,
-        "retryIntervalInSeconds": 30,
-        "secureOutput": false,
-        "secureInput": false
-    },
-    "userProperties": [],
-    "typeProperties": {
-        "source": {
-            "type": "BinarySource",
-            "storeSettings": {
-                "type": "AzureBlobStorageReadSettings",
-                "recursive": true,
-                "modifiedDatetimeStart": {
-                    "value": "",
-                    "type": "Expression"
-                },
-                "modifiedDatetimeEnd": {
-                    "value": "",
-                    "type": "Expression"
-                },
-                "wildcardFileName": {
-                    "value": "*",
-                    "type": "Expression"
-                }
-            }
-        },
-        "sink": {
-            "type": "BinarySink",
-            "storeSettings": {
-                "type": "AzureBlobFSWriteSettings"
-            }
-        },
-        "enableStaging": false
-    }
-  }
-]
-JSON
-}
-
 ##### Pipeline to Copy Data and Execute Dataflow to Remove Alphanumeric Characters #####
 resource "azurerm_data_factory_pipeline" "adf_pipeline_remove_alphanumeric" {
   name                = "adfpipelineremovealphanumeric"
@@ -1012,6 +958,7 @@ resource "azurerm_data_factory_trigger_schedule" "adf_trigger_schedule" {
 ################################## UNUSED #####################################
 /*
 ##### Dataset for Parquet #####
+# Requires more detailed connections, linked_service_name, also needs updated http_server_location details
 resource "azurerm_data_factory_dataset_parquet" "adf_ds_parquet_01" {
   name                = "adfdsparquet01"
   resource_group_name = var.resource-group-dev
@@ -1034,6 +981,7 @@ data "azurerm_cosmosdb_account" "adf_data_cosmosdb_account" {
 }
 
 ##### Linked Service for Cosmos DB Storage #####
+# Requires more resource details, account_endpoint, account_key, database
 resource "azurerm_data_factory_linked_service_cosmosdb" "adf_link_cosmosdb" {
   name                = "adflinkcosmosdb"
   resource_group_name = var.resource-group-dev
@@ -1052,6 +1000,7 @@ data "azurerm_function_app" "adf_data_function_app" {
 }
 
 ##### Linked Service for Azure Function #####
+# Requires resource details, including URL and key
 resource "azurerm_data_factory_linked_service_azure_function" "adf_link_azure_function" {
   name                = "adflinkazurefunction"
   resource_group_name = var.resource-group-dev
@@ -1063,6 +1012,8 @@ resource "azurerm_data_factory_linked_service_azure_function" "adf_link_azure_fu
 
 /*
 ################################ Databricks ################################
+# Unused databricks code as more resource details are needed, connection details need to be updated
+
 # create pub subnet for databricks hosts
 resource "azurerm_subnet" "pub_subnet" {
   name                 = "${var.resource_prefix}sbxarmsubuw2001"
@@ -1114,6 +1065,8 @@ resource "azurerm_databricks_workspace" "databricks" {
 
 /*
 ################################ Azure Machine Learning ################################
+# Unused databricks code as more resource details are needed, connection details need to be updated
+
 resource "azurerm_resource_group" "rg" {
   name = "${var.resource_prefix}sbxarmrgp${var.resource_instance}"
   location = var.region
@@ -1156,6 +1109,8 @@ resource "azurerm_machine_learning_workspace" "aml" {
 
 /*
 ##### Pipeline to Bulk Copy from Files to Database #####
+# Requires revisions to ForEach section of JSON template
+
 resource "azurerm_data_factory_pipeline" "adf_pipeline_04" {
   name                = "adfpipelinebulkcopyfilestodatabase"
   resource_group_name = var.resource-group-dev
@@ -1296,6 +1251,8 @@ JSON
 
 /*
 ##### Pipeline to Move Files #####
+# Requires revisions to ForEach section of JSON template
+
 resource "azurerm_data_factory_pipeline" "adf_pipeline_06" {
   name                = "adfpipelinecopysaptoadls"
   resource_group_name = var.resource-group-dev
