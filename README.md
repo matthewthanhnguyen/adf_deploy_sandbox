@@ -153,5 +153,5 @@ Defines common tags including consumer organization, environment type and suppor
 Holds currently unused files, including PROD version files.  Also holds previous variable declarations, which has been duplicated over into variables_adf_dev.tf
 
 TODO: 
-- Update to use dataflow resources instead of ARM template resources
+- Due to Terraform limitation, currently using ARM template resources to deploy dataflow components.  Needs to be updated to use Terraform dataflow resources when available
 - Merge main_adf_dev.tf with main.tf, currently duplicated components have been commented out in main_adf_dev.tf 
